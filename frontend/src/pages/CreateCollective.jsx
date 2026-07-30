@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
 import { api } from "../api.js";
-import { setSessionMember } from "../lib/session.js";
+import { setSessionMember, setSessionToken } from "../lib/session.js";
 import { Check, PartyPopper } from "lucide-react";
 import { Card, Button, Input, Select, ErrorNote, CopyButton, IconChip } from "../components/ui.jsx";
 import PublicShell from "../components/PublicShell.jsx";
@@ -37,7 +37,12 @@ export default function CreateCollective() {
         organizer_email: form.organizer_email || null,
         organizer_phone: form.organizer_phone || null,
       }),
-    onSuccess: (c) => setSessionMember(c.id, c.organizer_id),
+    onSuccess: (c) => {
+      setSessionMember(c.id, c.organizer_id);
+      // Returned once and only here. Without keeping it, the organizer would be
+      // locked out of the collective they just created.
+      setSessionToken(c.id, c.organizer_token);
+    },
   });
 
   if (create.isSuccess) {

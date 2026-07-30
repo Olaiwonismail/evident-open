@@ -26,6 +26,7 @@ import asyncio
 import base64
 import json
 import logging
+from datetime import date
 from decimal import Decimal
 
 from app.config import settings
@@ -79,18 +80,31 @@ EXTRACTION_SCHEMA = {
     "additionalProperties": False,
 }
 
-PROMPT = (
-    "Read this expense document for a Nigerian community group's treasury.\n\n"
-    "Extract only what is actually visible. Do not infer, complete, or guess a "
-    "value that isn't printed — use null instead. If the image is too blurry, "
-    "dark, or cropped to read reliably, set legible to false and return nulls "
-    "rather than a best guess.\n\n"
-    "Amounts are in naira unless the document says otherwise. Report the grand "
-    "total (after tax and discounts), not a subtotal or a single line item.\n\n"
-    "Use `notes` for anything a reviewer should know: visible alteration, "
-    "mismatched totals, a date far in the past, or a document that isn't an "
-    "expense document at all."
-)
+def _prompt() -> str:
+    """Built per call so the model is told what day it is.
+
+    Without this it dates its own reasoning from its training cutoff and reports
+    recent, valid documents as post-dated — observed on a real invoice two days
+    old. `notes` is published to the approver and the ledger, so a wrong note is
+    a false accusation against a legitimate expense, not a harmless miss.
+    """
+    return (
+        "Read this expense document for a Nigerian community group's treasury.\n\n"
+        f"Today's date is {date.today().isoformat()}. Judge whether a document "
+        "date is stale or post-dated against that, never against your own sense "
+        "of the current date.\n\n"
+        "Extract only what is actually visible. Do not infer, complete, or guess a "
+        "value that isn't printed — use null instead. If the image is too blurry, "
+        "dark, or cropped to read reliably, set legible to false and return nulls "
+        "rather than a best guess.\n\n"
+        "Amounts are in naira unless the document says otherwise. Report the grand "
+        "total (after tax and discounts), not a subtotal or a single line item.\n\n"
+        "Use `notes` only for something a reviewer should act on: visible "
+        "alteration, a total that disagrees with the line items, a date far in "
+        "the past, or a document that isn't an expense document at all. Leave it "
+        "null when the document is unremarkable — a note on a clean document "
+        "reads to the group as an accusation."
+    )
 
 
 def _client():
@@ -126,7 +140,7 @@ async def extract(data: bytes, media_type: str) -> dict | None:
         # depending on an async binding whose shape isn't documented here.
         return client.interactions.create(
             model=MODEL,
-            input=[_input_part(data, media_type), {"type": "text", "text": PROMPT}],
+            input=[_input_part(data, media_type), {"type": "text", "text": _prompt()}],
             response_format={
                 "type": "text",
                 "mime_type": "application/json",

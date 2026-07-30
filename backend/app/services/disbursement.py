@@ -53,6 +53,13 @@ async def disburse_expense(expense_id: str, approver_id: str, db: AsyncSession) 
     if not approver or approver.role not in ("committee", "organizer"):
         raise PermissionError("Only committee members can approve expenses")
 
+    # No solo spending. This guard belongs here rather than only in the UI: hiding
+    # the button stops an honest mistake, and nothing else. A committee member of
+    # one is the exact position this product exists to make accountable, so the
+    # rule is enforced where the money actually moves.
+    if expense.requested_by == approver_id:
+        raise PermissionError("You cannot approve your own request")
+
     collective_result = await db.execute(select(Collective).where(Collective.id == expense.collective_id))
     collective = collective_result.scalar_one_or_none()
 

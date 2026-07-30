@@ -9,6 +9,7 @@ from app.models.collective import Collective
 from app.models.contribution import Contribution
 from app.models.member import Member
 from app.models.unmatched import UnmatchedTransfer
+from app.services import auth
 
 router = APIRouter(prefix="/collectives", tags=["ledger"])
 
@@ -89,9 +90,13 @@ async def resolve_unmatched(
     unmatched_id: str,
     body: ResolveUnmatchedRequest,
     db: AsyncSession = Depends(get_db),
+    me: Member = Depends(auth.current_member),
 ):
     """Attribute an unmatched transfer to a member: the money finally enters the
     ledger as that member's contribution, so nothing is quietly absorbed."""
+    # Deciding whose money this was is a committee call — it credits a real
+    # balance to a real person and cannot be undone on an append-only ledger.
+    auth.require_committee(auth.require_collective(me, collective_id))
     result = await db.execute(
         select(UnmatchedTransfer).where(
             UnmatchedTransfer.id == unmatched_id,

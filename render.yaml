@@ -27,3 +27,21 @@ services:
         sync: false
       - key: BMONI_WEBHOOK_SECRET
         sync: false
+      # without this the receipt check degrades to "no opinion" on every upload —
+      # the AI is simply absent rather than visibly broken, so it fails quietly
+      - key: GEMINI_API_KEY
+        sync: false
+      # Receipts land here. On the free instance type this is ephemeral: the
+      # directory is wiped on every deploy and restart, so stored receipts stop
+      # resolving and "View receipt" 404s. Attaching a disk (below) is the fix,
+      # and it requires a paid instance.
+      - key: RECEIPT_STORAGE_DIR
+        value: /var/data/receipts
+
+    # Uncomment together with a paid instance type. Declaring a disk on the free
+    # plan fails blueprint sync, so it stays commented rather than breaking the
+    # deploy for a reader who applies this file as-is.
+    # disk:
+    #   name: receipts
+    #   mountPath: /var/data
+    #   sizeGB: 1

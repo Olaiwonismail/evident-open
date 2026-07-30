@@ -15,7 +15,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models.collective import Collective
-from app.services import receipt_ai, receipts
+from app.models.member import Member
+from app.services import auth, receipt_ai, receipts
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/collectives", tags=["receipts"])
@@ -28,8 +29,12 @@ async def upload_receipt(
     amount: float = Form(...),
     reason: str = Form(""),
     db: AsyncSession = Depends(get_db),
+    me: Member = Depends(auth.current_member),
 ):
     """Store a receipt, fingerprint it, and run the advisory checks."""
+    # Members only: uploads cost a model call and write to disk, and the reply
+    # reveals which past expenses a receipt duplicates.
+    auth.require_collective(me, collective_id)
     exists = (await db.execute(
         select(Collective.id).where(Collective.id == collective_id)
     )).scalar_one_or_none()

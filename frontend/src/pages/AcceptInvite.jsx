@@ -1,7 +1,7 @@
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../api.js";
-import { setSessionMember } from "../lib/session.js";
+import { setSessionMember, setSessionToken } from "../lib/session.js";
 import { naira } from "../lib/format.js";
 import { Mail } from "lucide-react";
 import { Card, Button, Badge, Spinner, IconChip } from "../components/ui.jsx";
@@ -11,7 +11,10 @@ import PublicShell from "../components/PublicShell.jsx";
 // they've been asked to join, then confirm and step inside as themselves.
 export default function AcceptInvite() {
   const { collectiveId, memberId } = useParams();
+  const [params] = useSearchParams();
   const navigate = useNavigate();
+  // the credential travels in the invite link's query string
+  const token = params.get("t");
 
   const collective = useQuery({
     queryKey: ["collective", collectiveId],
@@ -86,8 +89,15 @@ export default function AcceptInvite() {
           className="mt-6 w-full"
           onClick={() => {
             setSessionMember(collectiveId, memberId);
-            // land them on their own ?m= link — a durable, bookmarkable personal URL
-            navigate(`/c/${collectiveId}?m=${memberId}`);
+            // Land them on their own durable, bookmarkable personal URL. The token
+            // link is the one that actually authorises anything; ?m= remains for
+            // the demo collective, which has no server to sign a token.
+            if (token) {
+              setSessionToken(collectiveId, token);
+              navigate(`/c/${collectiveId}?t=${encodeURIComponent(token)}`);
+            } else {
+              navigate(`/c/${collectiveId}?m=${memberId}`);
+            }
           }}
         >
           Accept & join {c.name.split(" ")[0]}

@@ -1,4 +1,5 @@
 import { demoApi, DEMO_ID } from "./demo/store.js";
+import { getSessionToken } from "./lib/session.js";
 
 // The demo collective lives entirely in the in-memory store; every other
 // collective hits the real backend. Dispatch happens per call, so the demo
@@ -6,10 +7,11 @@ import { demoApi, DEMO_ID } from "./demo/store.js";
 export { DEMO_ID };
 export const isDemoCollective = (id) => id === DEMO_ID;
 
-// TESTING: lets an organizer approve/reject their own expense request so a
-// solo tester can run the whole loop. Set back to false to restore the
-// "no solo spending" guard for the real demo.
-export const ALLOW_SELF_APPROVAL = true;
+// "No solo spending": the member who requests an expense can never be the one
+// who approves it. Flipping this to true lets a solo tester drive the whole loop
+// in one browser, at the cost of disabling the control — so it stays false, and
+// testing uses two member links instead.
+export const ALLOW_SELF_APPROVAL = false;
 
 // Vite sets import.meta.env.DEV=true under `vite dev`, false in a production
 // build — so local dev hits the local backend and the deployed UI hits Render,
@@ -28,10 +30,19 @@ export const resolveReceiptUrl = (url) => {
   return url.startsWith("/") ? `${API}${url}` : url;
 };
 
+// The member's credential, pulled from the session rather than threaded through
+// every call site. Absent for a public visitor, which is fine — reads don't need
+// it, and writes are meant to fail without it.
+const auth = (collectiveId) => {
+  const token = getSessionToken(collectiveId);
+  return token ? { "X-Member-Token": token } : {};
+};
+
 async function request(path, options = {}) {
+  const { headers, ...rest } = options;
   const res = await fetch(`${API}${path}`, {
-    headers: { "Content-Type": "application/json" },
-    ...options,
+    headers: { "Content-Type": "application/json", ...headers },
+    ...rest,
   });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(body.detail || `Request failed (${res.status})`);
@@ -40,8 +51,8 @@ async function request(path, options = {}) {
 
 // Multipart needs its own path: setting Content-Type by hand strips the
 // boundary the browser generates, so the upload arrives unparseable.
-async function upload(path, formData) {
-  const res = await fetch(`${API}${path}`, { method: "POST", body: formData });
+async function upload(path, formData, headers = {}) {
+  const res = await fetch(`${API}${path}`, { method: "POST", body: formData, headers });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(body.detail || `Upload failed (${res.status})`);
   return body;
@@ -52,12 +63,20 @@ const realApi = {
     request("/collectives", { method: "POST", body: JSON.stringify(data) }),
   getCollective: (id) => request(`/collectives/${id}`),
   getLedger: (id) => request(`/collectives/${id}/ledger`),
-  getMembers: (id) => request(`/collectives/${id}/members`),
+  // sent with the token when there is one: the roster is public by name and
+  // role, and contact details come back only for a committee member
+  getMembers: (id) => request(`/collectives/${id}/members`, { headers: auth(id) }),
+  getMe: (id) => request(`/collectives/${id}/me`, { headers: auth(id) }),
   inviteMember: (id, data) =>
-    request(`/collectives/${id}/members`, { method: "POST", body: JSON.stringify(data) }),
+    request(`/collectives/${id}/members`, {
+      method: "POST",
+      headers: auth(id),
+      body: JSON.stringify(data),
+    }),
   setMemberRole: (id, memberId, role) =>
     request(`/collectives/${id}/members/${memberId}/role`, {
       method: "POST",
+      headers: auth(id),
       body: JSON.stringify({ role }),
     }),
   getContributions: (id, memberId) =>
@@ -65,21 +84,29 @@ const realApi = {
   getExpenses: (id) => request(`/collectives/${id}/expenses`),
   getExpense: (id, expenseId) => request(`/collectives/${id}/expenses/${expenseId}`),
   submitExpense: (id, data) =>
-    request(`/collectives/${id}/expenses`, { method: "POST", body: JSON.stringify(data) }),
-  approveExpense: (id, expenseId, approverId) =>
+    request(`/collectives/${id}/expenses`, {
+      method: "POST",
+      headers: auth(id),
+      body: JSON.stringify(data),
+    }),
+  // No approver in the body any more — the server reads it off the token, so
+  // there is nothing here to forge.
+  approveExpense: (id, expenseId) =>
     request(`/collectives/${id}/expenses/${expenseId}/approve`, {
       method: "POST",
-      body: JSON.stringify({ approver_id: approverId }),
+      headers: auth(id),
     }),
-  rejectExpense: (id, expenseId, approverId, reason) =>
+  rejectExpense: (id, expenseId, _approverId, reason) =>
     request(`/collectives/${id}/expenses/${expenseId}/reject`, {
       method: "POST",
-      body: JSON.stringify({ approver_id: approverId, reason }),
+      headers: auth(id),
+      body: JSON.stringify({ reason }),
     }),
   getUnmatched: (id) => request(`/collectives/${id}/unmatched`),
   resolveUnmatched: (id, unmatchedId, memberId) =>
     request(`/collectives/${id}/unmatched/${unmatchedId}/resolve`, {
       method: "POST",
+      headers: auth(id),
       body: JSON.stringify({ member_id: memberId }),
     }),
   uploadReceipt: (id, file, amount, reason) => {
@@ -87,7 +114,7 @@ const realApi = {
     form.append("file", file);
     form.append("amount", String(amount || 0));
     form.append("reason", reason || "");
-    return upload(`/collectives/${id}/receipts`, form);
+    return upload(`/collectives/${id}/receipts`, form, auth(id));
   },
   getBanks: () => request("/banks"),
   lookupAccount: (accountNumber, bankCode) =>
@@ -110,6 +137,8 @@ export const api = {
   getCollective: (id) => forId(id).getCollective(id),
   getLedger: (id) => forId(id).getLedger(id),
   getMembers: (id) => forId(id).getMembers(id),
+  // real collectives only — the demo resolves identity from its in-memory roster
+  getMe: (id) => realApi.getMe(id),
   inviteMember: (id, data) => forId(id).inviteMember(id, data),
   setMemberRole: (id, memberId, role) => forId(id).setMemberRole(id, memberId, role),
   getContributions: (id, memberId) => forId(id).getContributions(id, memberId),

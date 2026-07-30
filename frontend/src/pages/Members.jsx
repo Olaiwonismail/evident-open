@@ -140,7 +140,12 @@ function InviteMember({ collectiveId, onClose }) {
   });
 
   if (invite.isSuccess) {
-    const link = `${window.location.origin}/join/${collectiveId}/${invite.data.id}`;
+    // The token is the member's credential and it is returned exactly once, here.
+    // It rides in the invite link, so this panel is the only chance to pass it on
+    // — no listing endpoint will hand it out again.
+    const link =
+      `${window.location.origin}/join/${collectiveId}/${invite.data.id}` +
+      (invite.data.token ? `?t=${encodeURIComponent(invite.data.token)}` : "");
     return (
       <Card className="p-6">
         <div className="flex items-center gap-2">

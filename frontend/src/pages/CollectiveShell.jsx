@@ -2,7 +2,12 @@ import { useEffect, useState } from "react";
 import { Link, NavLink, Outlet, useParams, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { api, isDemoCollective } from "../api.js";
-import { getSessionMember, setSessionMember } from "../lib/session.js";
+import {
+  getSessionMember,
+  setSessionMember,
+  getSessionToken,
+  setSessionToken,
+} from "../lib/session.js";
 import { Badge, Spinner, CopyButton } from "../components/ui.jsx";
 
 const roleTone = { organizer: "review", committee: "info", member: "neutral" };
@@ -11,18 +16,29 @@ export default function CollectiveShell() {
   const { collectiveId } = useParams();
   const [params] = useSearchParams();
 
-  // identity: a personal ?m= link wins and is remembered for the session
+  const isDemo = isDemoCollective(collectiveId);
+
+  // Two identity schemes, because the demo has no server to sign anything.
+  // Real collectives: ?t=<signed token> — the credential the API checks.
+  // Demo collective:  ?m=<member id>   — an in-memory roster, nothing to protect.
   const [memberId, setMemberIdState] = useState(
     () => params.get("m") || getSessionMember(collectiveId)
+  );
+  const [token, setTokenState] = useState(
+    () => params.get("t") || getSessionToken(collectiveId)
   );
   const setMemberId = (id) => {
     setMemberIdState(id);
     setSessionMember(collectiveId, id);
   };
-  // a ?m= link identifies the member; keep it in the URL so this stays a durable,
-  // bookmarkable personal link. Internal nav drops the query but falls back to the
-  // saved session identity, so who-you-are survives moving between tabs.
+  // The link carries identity; keep it remembered so who-you-are survives internal
+  // navigation, which drops the query string.
   useEffect(() => {
+    const t = params.get("t");
+    if (t) {
+      setSessionToken(collectiveId, t);
+      setTokenState(t);
+    }
     const m = params.get("m");
     if (m) {
       setSessionMember(collectiveId, m);
@@ -39,7 +55,19 @@ export default function CollectiveShell() {
     queryFn: () => api.getMembers(collectiveId),
   });
 
-  const me = (members.data || []).find((m) => m.id === memberId) || null;
+  // Identity is the server's answer for a real collective — the member list no
+  // longer decides who you are, because anyone can read it.
+  const meQuery = useQuery({
+    queryKey: ["me", collectiveId, token],
+    queryFn: () => api.getMe(collectiveId),
+    enabled: !isDemo && !!token,
+    retry: false,
+    staleTime: Infinity,
+  });
+
+  const me = isDemo
+    ? (members.data || []).find((m) => m.id === memberId) || null
+    : meQuery.data || null;
   const role = me?.role || "public";
   const isCommittee = role === "committee" || role === "organizer";
   const isOrganizer = role === "organizer";

@@ -10,14 +10,15 @@ from app.models.expense import Expense
 from app.models.collective import Collective
 from app.models.member import Member
 from app.models.ledger import LedgerEntry
-from app.services import payments, disbursement
+from app.services import auth, payments, disbursement
 from app.services.payments import PaymentProviderNotConfigured
 
 router = APIRouter(prefix="/collectives", tags=["expenses"])
 
 
 class SubmitExpenseRequest(BaseModel):
-    requested_by: str  # member id
+    # `requested_by` is deliberately absent: the requester is taken from the
+    # caller's token, so nobody can file an expense in someone else's name.
     amount: float
     reason: str
     receipt_url: str | None = None
@@ -32,12 +33,9 @@ class SubmitExpenseRequest(BaseModel):
     ai_flags: list[dict] | None = None
 
 
-class ApproveExpenseRequest(BaseModel):
-    approver_id: str
-
-
 class RejectExpenseRequest(BaseModel):
-    approver_id: str
+    # Likewise no `approver_id` — the decider is whoever holds the token, never
+    # whoever the request body claims.
     reason: str
 
 
@@ -72,7 +70,13 @@ def _serialize_expense(e: Expense, names: dict[str, str]) -> dict:
 
 
 @router.post("/{collective_id}/expenses")
-async def submit_expense(collective_id: str, body: SubmitExpenseRequest, db: AsyncSession = Depends(get_db)):
+async def submit_expense(
+    collective_id: str,
+    body: SubmitExpenseRequest,
+    db: AsyncSession = Depends(get_db),
+    me: Member = Depends(auth.current_member),
+):
+    auth.require_collective(me, collective_id)
     result = await db.execute(select(Collective).where(Collective.id == collective_id))
     collective = result.scalar_one_or_none()
     if not collective:
@@ -102,7 +106,7 @@ async def submit_expense(collective_id: str, body: SubmitExpenseRequest, db: Asy
 
     expense = Expense(
         collective_id=collective_id,
-        requested_by=body.requested_by,
+        requested_by=me.id,
         amount=body.amount,
         reason=body.reason,
         receipt_url=body.receipt_url,
@@ -150,11 +154,12 @@ async def get_expense(collective_id: str, expense_id: str, db: AsyncSession = De
 async def approve_expense(
     collective_id: str,
     expense_id: str,
-    body: ApproveExpenseRequest,
     db: AsyncSession = Depends(get_db),
+    me: Member = Depends(auth.current_member),
 ):
+    auth.require_committee(auth.require_collective(me, collective_id))
     try:
-        expense = await disbursement.disburse_expense(expense_id, body.approver_id, db)
+        expense = await disbursement.disburse_expense(expense_id, me.id, db)
     except PermissionError as exc:
         raise HTTPException(status_code=403, detail=str(exc))
     except ValueError as exc:
@@ -172,19 +177,22 @@ async def reject_expense(
     expense_id: str,
     body: RejectExpenseRequest,
     db: AsyncSession = Depends(get_db),
+    me: Member = Depends(auth.current_member),
 ):
-    result = await db.execute(select(Expense).where(Expense.id == expense_id))
+    approver = auth.require_committee(auth.require_collective(me, collective_id))
+    result = await db.execute(
+        select(Expense).where(Expense.id == expense_id, Expense.collective_id == collective_id)
+    )
     expense = result.scalar_one_or_none()
     if not expense or expense.status != "pending":
         raise HTTPException(status_code=404, detail="Expense not found or not pending")
-
-    approver_result = await db.execute(select(Member).where(Member.id == body.approver_id))
-    approver = approver_result.scalar_one_or_none()
-    if not approver or approver.role not in ("committee", "organizer"):
-        raise HTTPException(status_code=403, detail="Only committee members can reject expenses")
+    if expense.requested_by == approver.id:
+        raise HTTPException(
+            status_code=403, detail="You cannot decide on your own request"
+        )
 
     expense.status = "rejected"
-    expense.approved_by = body.approver_id
+    expense.approved_by = approver.id
     expense.rejection_reason = body.reason
 
     # zero-amount marker so the rejection stays visible on the public ledger

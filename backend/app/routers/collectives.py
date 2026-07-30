@@ -7,7 +7,7 @@ from sqlalchemy import select
 from app.database import get_db
 from app.models.collective import Collective
 from app.models.member import Member
-from app.services import provisioning
+from app.services import auth, provisioning
 from app.services.payments import PaymentProviderNotConfigured
 
 logger = logging.getLogger(__name__)
@@ -101,6 +101,9 @@ async def create_collective(body: CreateCollectiveRequest, db: AsyncSession = De
         # account above is pooled across every user and can't identify a payer
         "wallet_address": collective.wallet_address,
         "organizer_id": organizer.id,
+        # The organizer's credential, returned exactly once. It is what their
+        # personal link carries; the members list never gives it out again.
+        "organizer_token": auth.issue_token(organizer.id),
     }
 
 
@@ -116,7 +119,13 @@ async def get_collective(collective_id: str, db: AsyncSession = Depends(get_db))
 
 
 @router.post("/{collective_id}/members")
-async def invite_member(collective_id: str, body: InviteMemberRequest, db: AsyncSession = Depends(get_db)):
+async def invite_member(
+    collective_id: str,
+    body: InviteMemberRequest,
+    db: AsyncSession = Depends(get_db),
+    me: Member = Depends(auth.current_member),
+):
+    auth.require_committee(auth.require_collective(me, collective_id))
     result = await db.execute(select(Collective).where(Collective.id == collective_id))
     collective = result.scalar_one_or_none()
     if not collective:
@@ -149,13 +158,62 @@ async def invite_member(collective_id: str, body: InviteMemberRequest, db: Async
         "bank_account_number": member.bank_account_number,
         "bank_name": member.bank_name,
         "wallet_address": member.wallet_address,
+        # Handed to the inviter once, to pass on privately. This is the invitee's
+        # credential, so it is never returned by any listing endpoint.
+        "token": auth.issue_token(member.id),
+    }
+
+
+@router.get("/{collective_id}/me")
+async def get_me(collective_id: str, me: Member = Depends(auth.current_member)):
+    """Who the caller's token says they are, with their own private details.
+
+    Identity used to be resolved by matching `?m=<id>` against the public member
+    list, which meant identity was whatever the URL claimed. It comes from the
+    signed token now, so this is the only endpoint that can answer it.
+    """
+    auth.require_collective(me, collective_id)
+    return {
+        "id": me.id,
+        "name": me.name,
+        "role": me.role,
+        "email": me.email,
+        "phone": me.phone,
+        "bank_account_number": me.bank_account_number,
+        "bank_name": me.bank_name,
+        "wallet_address": me.wallet_address,
     }
 
 
 @router.get("/{collective_id}/members")
-async def list_members(collective_id: str, db: AsyncSession = Depends(get_db)):
+async def list_members(
+    collective_id: str,
+    db: AsyncSession = Depends(get_db),
+    viewer: Member | None = Depends(auth.optional_member),
+):
+    """The roster. Public by name and role; contact details are not.
+
+    This used to return the ORM rows whole, which published every member's email,
+    phone number and wallet identifiers to anyone holding the collective's link.
+    Who is in the group and who can approve spending is part of the transparency
+    claim. How to phone them is not.
+    """
     result = await db.execute(select(Member).where(Member.collective_id == collective_id))
-    return result.scalars().all()
+    members = result.scalars().all()
+    privileged = (
+        viewer is not None
+        and viewer.collective_id == collective_id
+        and viewer.role in ("committee", "organizer")
+    )
+    rows = []
+    for m in members:
+        row = {"id": m.id, "name": m.name, "role": m.role}
+        if privileged:
+            # the organizer manages the roster, so they see what they need to
+            row |= {"email": m.email, "phone": m.phone,
+                    "bank_account_number": m.bank_account_number}
+        rows.append(row)
+    return rows
 
 
 @router.post("/{collective_id}/members/{member_id}/role")
@@ -164,7 +222,13 @@ async def set_member_role(
     member_id: str,
     body: SetRoleRequest,
     db: AsyncSession = Depends(get_db),
+    me: Member = Depends(auth.current_member),
 ):
+    # Promotion to committee is promotion to spending authority, so it is the
+    # organizer's alone — a committee member cannot recruit their own quorum.
+    auth.require_collective(me, collective_id)
+    if me.role != "organizer":
+        raise HTTPException(status_code=403, detail="Only the organizer can change roles")
     if body.role not in ("member", "committee"):
         raise HTTPException(status_code=400, detail="Role must be 'member' or 'committee'")
     result = await db.execute(

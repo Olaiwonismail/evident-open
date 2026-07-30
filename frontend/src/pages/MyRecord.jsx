@@ -2,6 +2,7 @@ import { Link, useOutletContext } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { KeyRound, CircleDollarSign, Link2 } from "lucide-react";
 import { api } from "../api.js";
+import { getSessionToken } from "../lib/session.js";
 import { naira, formatTime } from "../lib/format.js";
 import { Card, CardHeader, Button, CopyButton, IconChip, Spinner, EmptyState, StatusBadge } from "../components/ui.jsx";
 
@@ -33,7 +34,12 @@ export default function MyRecord() {
   const { dues_amount, dues_frequency, total_paid = 0, contributions = [] } = q.data || {};
   const pct = dues_amount ? Math.min(100, Math.round((total_paid / dues_amount) * 100)) : null;
   const owed = dues_amount ? Math.max(0, dues_amount - total_paid) : null;
-  const personalLink = `${window.location.origin}/c/${collectiveId}?m=${me.id}`;
+  // Re-sharing your own link means re-sharing your own credential, so it carries
+  // the token you arrived with. The demo has no token and doesn't need one.
+  const sessionToken = getSessionToken(collectiveId);
+  const personalLink = sessionToken
+    ? `${window.location.origin}/c/${collectiveId}?t=${encodeURIComponent(sessionToken)}`
+    : `${window.location.origin}/c/${collectiveId}?m=${me.id}`;
 
   return (
     <div className="space-y-6">
