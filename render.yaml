@@ -17,5 +17,13 @@ services:
           property: connectionString
       - key: APP_BASE_URL
         sync: false
+      # also derives smart-wallet owner keys — regenerating it orphans every
+      # provisioned wallet, so set it once and keep it
       - key: SECRET_KEY
         generateValue: true
+      - key: BMONI_BASE_URL
+        value: https://embedded-dev.bmoni.com
+      - key: BMONI_API_KEY
+        sync: false
+      - key: BMONI_WEBHOOK_SECRET
+        sync: false

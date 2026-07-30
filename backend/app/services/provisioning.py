@@ -52,7 +52,7 @@ async def provision(*, ref: str, display_name: str, email: str | None = None,
     phone = phone or _synthetic_phone(ref)
     first_name, _, last_name = display_name.partition(" ")
 
-    user = await bmoni_client.create_user(first_name or "Evident", email, phone)
+    user = await bmoni_client.get_or_create_user(first_name or "Evident", email, phone)
     user_id = user.get("bmoniUserId")
     if not user_id:
         raise bmoni_client.BmoniAPIError(f"no bmoniUserId in create-user response: {user}")
@@ -81,7 +81,7 @@ async def provision(*, ref: str, display_name: str, email: str | None = None,
         raise bmoni_client.BmoniAPIError(f"bad owner-proof challenge: {challenge}")
 
     signature = signing.sign_text(ref, message)
-    wallet = await bmoni_client.create_managed_wallet(
+    wallet = await bmoni_client.get_or_create_wallet(
         user_id, owner_address, challenge_id, signature)
     wallet_id = wallet.get("id")
     wallet_address = wallet.get("walletAddress")

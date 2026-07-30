@@ -62,6 +62,28 @@ POST  /v1/users/{id}/onboarding/start-nigeria      200  → hasBvn, hasLocalWall
 GET   /v1/users/{id}/smart-wallets/account/balances 200 → NGN "0"
 ```
 
+### Re-adoption — not in the first draft of this plan, added after it broke
+
+Neither create call is idempotent, and both failure modes only appear on the
+*second* run:
+
+- `POST /v1/users` → **409** on a duplicate email or phone.
+- `create-managed` → **409 E502** once a wallet exists for that currency.
+
+Because Evident derives contacts and keys deterministically, a wiped database
+would otherwise be permanently unable to re-adopt the wallets it had already
+created — the wallets would exist, hold money, and be unreachable.
+
+So `get_or_create_user()` falls back to a paginated search of `GET /v1/users`
+(cap 100 per page, and the sandbox key is shared so the roster is long), and
+`get_or_create_wallet()` falls back to `find_wallet()`. **Verified:** deleting
+the database and re-running `seed_demo.py` reproduced byte-identical wallet ids
+and addresses.
+
+A related trap that cost a run: the first `_synthetic_email` sliced `ref[:8]`,
+and three member UUIDs generated together shared those eight characters — so all
+three collapsed onto one email and BMoni 409'd. Contacts now hash the whole ref.
+
 Notes that cost time to discover:
 
 - **`bmoniUserId`, not `id`.** The create-user response carries both; only
@@ -124,6 +146,26 @@ makes a mismatch between the two visible instead of silent.
 | 6 | New columns for BMoni identifiers | `models/{collective,member}.py` | built |
 | 7 | Settings + dependency | `config.py`, `requirements.txt` | built |
 | 8 | Demo seed script | `seed_demo.py` | built |
+
+## 4a. What is actually verified against the sandbox
+
+| Verified working | Evidence |
+| --- | --- |
+| Server-side wallet creation, no SDK | 4 wallets provisioned |
+| Full provisioning chain, user → KYC → wallet → naira rail | `seed_demo.py` completes |
+| Re-adoption after a database wipe | identical wallet ids/addresses on re-run |
+| Bank list | **170** live Nigerian banks via `GET /banks` |
+| Recipient verification reachable, errors surfaced cleanly | `E101` → HTTP 400 with a usable message |
+| Ingest poller | runs clean, 0 rows on an empty wallet |
+| App boots, 16 routes | `app.openapi()` |
+
+| Not yet verified | Why |
+| --- | --- |
+| A *successful* account verification | needs a real NUBAN — every sample number returns `E101` |
+| Contribution ingestion end to end | needs test funds; wallets are at ₦0 |
+| The offramp → sign → paid path | same — nothing to pay out yet |
+| Webhook payload parsing | shape undocumented, no delivery observed |
+| `send_to_account` body shape | inferred from the endpoint name, never called |
 
 ---
 

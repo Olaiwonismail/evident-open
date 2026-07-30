@@ -70,6 +70,53 @@ async def create_user(first_name: str, email: str, phone: str) -> dict:
     return _unwrap(data, "user")
 
 
+MAX_PAGE_SIZE = 100  # the API rejects anything larger
+
+
+async def list_users(page: int = 1, limit: int = MAX_PAGE_SIZE) -> list:
+    data = await _request("GET", "/v1/users",
+                          params={"page": page, "limit": min(limit, MAX_PAGE_SIZE)})
+    if isinstance(data, list):
+        return data
+    for key in ("users", "results", "items", "data"):
+        value = data.get(key) if isinstance(data, dict) else None
+        if isinstance(value, list):
+            return value
+    return []
+
+
+async def find_user_by_email(email: str, max_pages: int = 20) -> dict | None:
+    """Recover an existing user. Needed because create-user 409s on a duplicate
+    email or phone, and Evident's synthetic contacts are deterministic — so a
+    wiped database would otherwise be unable to re-adopt the wallets it made.
+
+    Paginated because the sandbox key is shared and the roster is long; capped so
+    a very long one can't spin forever.
+    """
+    target = email.strip().lower()
+    for page in range(1, max_pages + 1):
+        batch = await list_users(page=page)
+        if not batch:
+            return None
+        for user in batch:
+            if isinstance(user, dict) and str(user.get("email", "")).strip().lower() == target:
+                return user
+    return None
+
+
+async def get_or_create_user(first_name: str, email: str, phone: str) -> dict:
+    try:
+        return await create_user(first_name, email, phone)
+    except BmoniAPIError as exc:
+        if "409" not in str(exc):
+            raise
+        existing = await find_user_by_email(email)
+        if not existing:
+            raise
+        logger.info("Re-adopted existing BMoni user for %s", email)
+        return existing
+
+
 async def update_kyc(user_id: str, *, first_name: str, last_name: str, email: str,
                      phone: str, date_of_birth: str, bvn: str) -> dict:
     """Fields sit at the top level — the `profile` wrapper is invite-only.
@@ -133,6 +180,62 @@ async def create_managed_wallet(user_id: str, owner_address: str, challenge_id: 
         "ownerProofSignature": signature,
     })
     return _unwrap(data)
+
+
+async def find_wallet(user_id: str, currency: str = CURRENCY) -> dict | None:
+    """Locate an existing NGN wallet.
+
+    Wallet creation 409s once a wallet exists for the currency, so re-adopting is
+    the only way a wiped database can recover the wallets it already made. Note
+    the currency goes in as CNGN but comes back as NGN — match either.
+    """
+    wanted = {currency.upper(), currency.upper().removeprefix("C"), "CNGN", "NGN"}
+    try:
+        listing = await account_wallets(user_id)
+    except BmoniAPIError:
+        listing = None
+
+    rows = []
+    if isinstance(listing, list):
+        rows = listing
+    elif isinstance(listing, dict):
+        for key in ("wallets", "results", "items", "data"):
+            if isinstance(listing.get(key), list):
+                rows = listing[key]
+                break
+
+    fallback_address = None
+    if not rows:
+        balances = await account_balances(user_id)
+        fallback_address = balances.get("smartAccountAddress")
+        rows = balances.get("balances") or []
+
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        if str(row.get("currency", "")).upper() not in wanted:
+            continue
+        wallet_id = row.get("id") or row.get("smartWalletId")
+        address = (row.get("walletAddress") or row.get("address")
+                   or row.get("smartAccountAddress") or fallback_address)
+        if wallet_id and address:
+            return {"id": wallet_id, "walletAddress": address, "currency": row.get("currency")}
+    return None
+
+
+async def get_or_create_wallet(user_id: str, owner_address: str, challenge_id: str,
+                               signature: str, currency: str = CURRENCY) -> dict:
+    try:
+        return await create_managed_wallet(user_id, owner_address, challenge_id,
+                                           signature, currency)
+    except BmoniAPIError as exc:
+        if "409" not in str(exc):
+            raise
+        existing = await find_wallet(user_id, currency)
+        if not existing:
+            raise
+        logger.info("Re-adopted existing BMoni wallet %s", existing["id"])
+        return existing
 
 
 async def account_balances(user_id: str) -> dict:
