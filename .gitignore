@@ -1,0 +1,34 @@
+# Project docs (local reference only)
+Evident_MVP_Features.docx
+Evident_PRD (1).pdf
+Evident_Nomba_API_Reference.pdf
+
+# Secrets — never commit env files (keep .env.example tracked)
+.env
+**/.env
+.env.*
+!.env.example
+!**/.env.example
+
+# Python
+**/__pycache__/
+*.pyc
+*.pyo
+venv/
+**/venv/
+.venv/
+
+# Local databases
+*.db
+*.sqlite3
+
+# Frontend (when added)
+node_modules/
+dist/
+build/
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

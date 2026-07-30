@@ -1,0 +1,12 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+aiosqlite
+asyncpg
+python-dotenv
+httpx
+pydantic
+pydantic-settings
+python-multipart
+apscheduler
+eth-account

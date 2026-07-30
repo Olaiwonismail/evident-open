@@ -1,0 +1,201 @@
+/* Font identity: IBM Plex Sans carries the UI; IBM Plex Mono carries every
+   figure and account number — the "engineered record" feel that suits a
+   public ledger. Neither is on the overused-AI-face list. */
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap");
+@import "tailwindcss";
+
+/* Semantic tokens resolve to runtime CSS variables, so light/dark flip for
+   free. `inline` keeps the utility referencing the var rather than baking a
+   value at build time. */
+@theme inline {
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", monospace;
+
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-panel: var(--panel);
+  --color-on-panel: var(--on-panel);
+  --color-on-panel-dim: var(--on-panel-dim);
+
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-on-brand: var(--on-brand);
+
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+
+  --color-brand: var(--brand);
+  --color-brand-strong: var(--brand-strong);
+  --color-brand-ink: var(--brand-ink);
+  --color-brand-soft: var(--brand-soft);
+
+  --color-pos: var(--pos);
+  --color-pos-ink: var(--pos-ink);
+  --color-pos-soft: var(--pos-soft);
+  --color-neg: var(--neg);
+  --color-neg-ink: var(--neg-ink);
+  --color-neg-soft: var(--neg-soft);
+  --color-warn: var(--warn);
+  --color-warn-ink: var(--warn-ink);
+  --color-warn-soft: var(--warn-soft);
+  --color-info: var(--info);
+  --color-info-ink: var(--info-ink);
+  --color-info-soft: var(--info-soft);
+  --color-review: var(--review);
+  --color-review-ink: var(--review-ink);
+  --color-review-soft: var(--review-soft);
+}
+
+/* Light — a cool near-white canvas (not cream), teal brand that reads as
+   trustworthy without collapsing into the navy-and-gold fintech default.
+   Money direction stays green/red as semantics, separate from the brand. */
+:root {
+  --canvas: oklch(0.984 0.004 220);
+  --surface: oklch(1 0 0);
+  --surface-2: oklch(0.965 0.006 220);
+  --panel: oklch(0.26 0.03 215);
+  --on-panel: oklch(0.97 0.01 210);
+  --on-panel-dim: oklch(0.78 0.02 210);
+
+  --ink: oklch(0.26 0.02 235);
+  --muted: oklch(0.47 0.02 235);   /* ≥4.5:1 on surface — replaces slate-400 */
+  --faint: oklch(0.53 0.018 235);  /* still AA for non-body meta on surface */
+  --on-brand: oklch(0.99 0.005 200);
+
+  --line: oklch(0.915 0.006 235);
+  --line-strong: oklch(0.86 0.008 235);
+
+  --brand: oklch(0.52 0.088 205);
+  --brand-strong: oklch(0.46 0.094 206);
+  --brand-ink: oklch(0.44 0.09 206);   /* brand as text on light */
+  --brand-soft: oklch(0.95 0.022 205);
+
+  --pos: oklch(0.55 0.12 158);
+  --pos-ink: oklch(0.46 0.11 158);
+  --pos-soft: oklch(0.95 0.03 158);
+  --neg: oklch(0.56 0.19 25);
+  --neg-ink: oklch(0.5 0.19 25);
+  --neg-soft: oklch(0.95 0.03 25);
+  --warn: oklch(0.7 0.13 72);
+  --warn-ink: oklch(0.5 0.1 62);
+  --warn-soft: oklch(0.95 0.04 78);
+  --info: oklch(0.56 0.11 240);
+  --info-ink: oklch(0.48 0.11 250);
+  --info-soft: oklch(0.95 0.03 240);
+  --review: oklch(0.55 0.15 300);
+  --review-ink: oklch(0.48 0.15 300);
+  --review-soft: oklch(0.95 0.035 300);
+}
+
+/* Dark — deep ink-teal, not black. Brighter brand + softer figures so money
+   stays legible against a low-light panel. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --canvas: oklch(0.19 0.018 232);
+    --surface: oklch(0.23 0.02 232);
+    --surface-2: oklch(0.27 0.022 232);
+    --panel: oklch(0.16 0.02 228);
+    --on-panel: oklch(0.96 0.01 210);
+    --on-panel-dim: oklch(0.74 0.02 210);
+
+    --ink: oklch(0.95 0.008 230);
+    --muted: oklch(0.74 0.015 230);
+    --faint: oklch(0.64 0.015 230);
+    --on-brand: oklch(0.15 0.02 220);
+
+    --line: oklch(0.32 0.02 232);
+    --line-strong: oklch(0.4 0.022 232);
+
+    --brand: oklch(0.72 0.1 198);
+    --brand-strong: oklch(0.78 0.1 198);
+    --brand-ink: oklch(0.78 0.1 198);
+    --brand-soft: oklch(0.3 0.045 205);
+
+    --pos: oklch(0.72 0.13 158);
+    --pos-ink: oklch(0.8 0.13 158);
+    --pos-soft: oklch(0.3 0.05 158);
+    --neg: oklch(0.68 0.17 25);
+    --neg-ink: oklch(0.76 0.16 25);
+    --neg-soft: oklch(0.32 0.07 25);
+    --warn: oklch(0.8 0.12 78);
+    --warn-ink: oklch(0.84 0.11 82);
+    --warn-soft: oklch(0.33 0.06 78);
+    --info: oklch(0.72 0.11 245);
+    --info-ink: oklch(0.8 0.1 245);
+    --info-soft: oklch(0.31 0.06 245);
+    --review: oklch(0.74 0.13 300);
+    --review-ink: oklch(0.82 0.12 300);
+    --review-soft: oklch(0.32 0.06 300);
+  }
+}
+
+/* Explicit override hook (data-theme="dark") for a future manual toggle. */
+:root[data-theme="dark"] {
+  --canvas: oklch(0.19 0.018 232);
+  --surface: oklch(0.23 0.02 232);
+  --surface-2: oklch(0.27 0.022 232);
+  --panel: oklch(0.16 0.02 228);
+  --on-panel: oklch(0.96 0.01 210);
+  --on-panel-dim: oklch(0.74 0.02 210);
+  --ink: oklch(0.95 0.008 230);
+  --muted: oklch(0.74 0.015 230);
+  --faint: oklch(0.64 0.015 230);
+  --on-brand: oklch(0.15 0.02 220);
+  --line: oklch(0.32 0.02 232);
+  --line-strong: oklch(0.4 0.022 232);
+  --brand: oklch(0.72 0.1 198);
+  --brand-strong: oklch(0.78 0.1 198);
+  --brand-ink: oklch(0.78 0.1 198);
+  --brand-soft: oklch(0.3 0.045 205);
+  --pos: oklch(0.72 0.13 158);
+  --pos-ink: oklch(0.8 0.13 158);
+  --pos-soft: oklch(0.3 0.05 158);
+  --neg: oklch(0.68 0.17 25);
+  --neg-ink: oklch(0.76 0.16 25);
+  --neg-soft: oklch(0.32 0.07 25);
+  --warn: oklch(0.8 0.12 78);
+  --warn-ink: oklch(0.84 0.11 82);
+  --warn-soft: oklch(0.33 0.06 78);
+  --info: oklch(0.72 0.11 245);
+  --info-ink: oklch(0.8 0.1 245);
+  --info-soft: oklch(0.31 0.06 245);
+  --review: oklch(0.74 0.13 300);
+  --review-ink: oklch(0.82 0.12 300);
+  --review-soft: oklch(0.32 0.06 300);
+}
+
+html {
+  color-scheme: light dark;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--canvas);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* All figures line up in columns and don't jitter as they tick. */
+.tabular-nums,
+.font-mono {
+  font-variant-numeric: tabular-nums;
+}
+
+::selection {
+  background: var(--brand);
+  color: var(--on-brand);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
