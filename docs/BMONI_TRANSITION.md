@@ -40,9 +40,32 @@ cannot be reproduced on BMoni's naira rail. Two people paying into
 `6177463833` are indistinguishable at the bank level.
 
 **What replaces it:** every member does get their own **smart wallet**, with a
-unique EVM address. Contributions arrive as wallet-to-wallet transfers, and the
-sending wallet identifies the member exactly as unambiguously as a NUBAN did.
-The transparency guarantee is intact; the on-ramp is different.
+unique EVM address. When a contribution arrives, the sending wallet identifies
+the member exactly as unambiguously as a NUBAN did — so the ledger's attribution
+guarantee is intact.
+
+### …but a server cannot originate that transfer
+
+Investigated after the fact, and it corrects the plan above. `account/send` takes
+`SendToGroupInput`, whose `fromWalletId` is documented as a **personal** wallet
+id. `create-managed` produces a **group** wallet — its own challenge response
+returns a `groupId`. They are different objects, and this API exposes no endpoint
+that creates a personal wallet: those are provisioned on-device by
+`bmoni_embedded_sdk`.
+
+Probed to confirm rather than assumed: `{amount, fromWalletId}` clears validation
+and then 404s, because a group-wallet id is not a personal-wallet id. The
+endpoint also whitelists its properties (`recipientUserId`, `toAddress`,
+`phoneNumber` are all rejected outright), so there is no recipient field to
+redirect it at another wallet.
+
+**Consequence for the demo:** member → treasury contributions cannot be
+originated server-side at all. Money *into* the ledger stays in demo mode — which
+is where it already had to be, since the sandbox can't simulate an inbound bank
+transfer either. Money *out* is unaffected: the offramp runs from the group
+wallet, which is exactly what Evident holds.
+
+So request test funds against the **treasury's** phone number, not a member's.
 
 ---
 

@@ -54,7 +54,13 @@ async def show() -> None:
         print(f"\n{len(members)} member(s):")
         for m in members:
             print(f"  {m.name:<20} {m.role:<10} {m.wallet_address}")
-        print("\nFor test funds, give BMoni the phone number registered for that user:")
+        # Ask BMoni to credit the TREASURY, not a member. Members can't originate
+        # a transfer into it — that needs a personal wallet, which only the BMoni
+        # app provisions — so funding the treasury directly is what makes the
+        # real payout demo possible.
+        print("\nFor test funds, give BMoni the TREASURY phone number:")
+        print(f"  {provisioning._synthetic_phone(COLLECTIVE_ID)}   <-- request funds for this one")
+        print("\nMember numbers (only needed if a member wallet must hold funds):")
         for m in members:
             print(f"  {m.name}: {m.phone}")
 

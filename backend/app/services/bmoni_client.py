@@ -261,15 +261,27 @@ async def wallet_transactions(user_id: str, wallet_id: str) -> list:
     return []
 
 
-async def send_to_account(user_id: str, *, amount: str, recipient: str,
-                          currency: str = CURRENCY) -> dict:
-    """Wallet-to-wallet transfer — how a member pays dues, since the naira
-    deposit account is pooled and can't attribute a payer. UNVERIFIED body shape."""
-    data = await _request("POST", f"/v1/users/{user_id}/smart-wallets/account/send", {
-        "amount": amount,
-        "currency": currency,
-        "recipient": recipient,
-    })
+async def send_to_group(user_id: str, *, from_wallet_id: str, amount: str,
+                        note: str | None = None) -> dict:
+    """Send from a PERSONAL wallet into the sender's GROUP wallet.
+
+    NOT USABLE from a partner-only integration, and worth understanding why:
+    `create-managed` produces a *group* wallet (the challenge response even
+    returns a `groupId`), but `fromWalletId` here must be a *personal* wallet —
+    a different object, provisioned on-device by `bmoni_embedded_sdk`. This API
+    exposes no way to create one, so a server cannot originate this transfer.
+
+    Confirmed by probing: `{amount, fromWalletId}` passes validation, then 404s
+    because a group-wallet id isn't a personal-wallet id. The endpoint also
+    whitelists properties, so there is no recipient field to redirect it.
+
+    Kept for the day members onboard through the BMoni app, at which point their
+    personal wallet exists and this becomes the dues-payment call.
+    """
+    body = {"fromWalletId": from_wallet_id, "amount": amount}
+    if note:
+        body["note"] = note
+    data = await _request("POST", f"/v1/users/{user_id}/smart-wallets/account/send", body)
     return _unwrap(data)
 
 
