@@ -19,6 +19,15 @@ const API = import.meta.env.DEV
   ? "http://127.0.0.1:8000"
   : "https://evident-z4te.onrender.com";
 
+// Receipts are stored on the backend and referenced by a path, not an absolute
+// URL — resolve against the API origin so the link works from the deployed UI.
+// Demo receipts are never fetchable; they exist only in memory.
+export const resolveReceiptUrl = (url) => {
+  if (!url) return null;
+  if (url.startsWith("demo://")) return null;
+  return url.startsWith("/") ? `${API}${url}` : url;
+};
+
 async function request(path, options = {}) {
   const res = await fetch(`${API}${path}`, {
     headers: { "Content-Type": "application/json" },
@@ -26,6 +35,15 @@ async function request(path, options = {}) {
   });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(body.detail || `Request failed (${res.status})`);
+  return body;
+}
+
+// Multipart needs its own path: setting Content-Type by hand strips the
+// boundary the browser generates, so the upload arrives unparseable.
+async function upload(path, formData) {
+  const res = await fetch(`${API}${path}`, { method: "POST", body: formData });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.detail || `Upload failed (${res.status})`);
   return body;
 }
 
@@ -64,6 +82,13 @@ const realApi = {
       method: "POST",
       body: JSON.stringify({ member_id: memberId }),
     }),
+  uploadReceipt: (id, file, amount, reason) => {
+    const form = new FormData();
+    form.append("file", file);
+    form.append("amount", String(amount || 0));
+    form.append("reason", reason || "");
+    return upload(`/collectives/${id}/receipts`, form);
+  },
   getBanks: () => request("/banks"),
   lookupAccount: (accountNumber, bankCode) =>
     request(`/banks/lookup?account_number=${accountNumber}&bank_code=${bankCode}`, {
@@ -88,6 +113,8 @@ export const api = {
   inviteMember: (id, data) => forId(id).inviteMember(id, data),
   setMemberRole: (id, memberId, role) => forId(id).setMemberRole(id, memberId, role),
   getContributions: (id, memberId) => forId(id).getContributions(id, memberId),
+  uploadReceipt: (id, file, amount, reason) =>
+    forId(id).uploadReceipt(id, file, amount, reason),
   getExpenses: (id) => forId(id).getExpenses(id),
   getExpense: (id, expenseId) => forId(id).getExpense(id, expenseId),
   submitExpense: (id, data) => forId(id).submitExpense(id, data),

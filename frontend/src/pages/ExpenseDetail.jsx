@@ -2,9 +2,10 @@ import { useState } from "react";
 import { Link, useOutletContext, useParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, ExternalLink } from "lucide-react";
-import { api, ALLOW_SELF_APPROVAL } from "../api.js";
+import { api, ALLOW_SELF_APPROVAL, resolveReceiptUrl } from "../api.js";
 import { naira, formatTime, groupDigits } from "../lib/format.js";
 import { Card, Button, Input, Spinner, StatusBadge, ErrorNote } from "../components/ui.jsx";
+import ReceiptCheck from "../components/ReceiptCheck.jsx";
 
 // The full story of one request: who asked, who decided (and why), and
 // whether the money actually moved. This is where members follow an expense.
@@ -55,6 +56,8 @@ export default function ExpenseDetail() {
     (b) => (b.bankCode || b.code) === e.recipient_bank_code
   );
   const bankName = e.recipient_bank_name || bank?.bankName || bank?.name || e.recipient_bank_code;
+  const receiptHref = resolveReceiptUrl(e.receipt_url);
+  const flagged = e.ai_status === "flagged" && (e.ai_flags?.length || 0) > 0;
   const canDecide =
     isCommittee && e.status === "pending" && (ALLOW_SELF_APPROVAL || me?.id !== e.requested_by);
 
@@ -88,9 +91,9 @@ export default function ExpenseDetail() {
           <div>
             <dt className="text-xs uppercase tracking-wide text-muted">Receipt</dt>
             <dd className="mt-1 text-sm">
-              {e.receipt_url ? (
+              {receiptHref ? (
                 <a
-                  href={e.receipt_url}
+                  href={receiptHref}
                   target="_blank"
                   rel="noreferrer"
                   className="inline-flex items-center gap-1 font-medium text-brand-ink hover:underline"
@@ -98,12 +101,24 @@ export default function ExpenseDetail() {
                   View receipt
                   <ExternalLink size={13} strokeWidth={2} />
                 </a>
+              ) : e.receipt_url ? (
+                <span className="text-muted">Attached (not viewable in demo)</span>
               ) : (
                 <span className="text-muted">None attached</span>
               )}
             </dd>
           </div>
         </dl>
+
+        {e.ai_status && e.ai_status !== "none" && (
+          <div className="mt-5 border-t border-line pt-5">
+            <ReceiptCheck
+              status={e.ai_status}
+              flags={e.ai_flags}
+              extraction={e.ai_extraction}
+            />
+          </div>
+        )}
       </Card>
 
       <Card className="p-6">
@@ -117,6 +132,7 @@ export default function ExpenseDetail() {
           <p className="mt-1 text-xs text-muted">
             Approving disburses {naira(e.amount)} to {e.recipient_name} immediately, with your name
             on the ledger.
+            {flagged && " The receipt check found something — approving anyway is recorded there too."}
           </p>
           <DecisionControls approve={approve} reject={reject} />
         </Card>

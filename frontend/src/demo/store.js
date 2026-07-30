@@ -23,6 +23,10 @@ export const DEMO_ID = "demo";
 
 const db = { collectives: {} };
 
+// Receipts uploaded this session, keyed by name+size — lets demo mode show a
+// real duplicate detection rather than a scripted one.
+const demoReceipts = new Map();
+
 const col = (id) => {
   const c = db.collectives[id];
   if (!c) throw new Error("Collective not found");
@@ -448,6 +452,9 @@ export const demoApi = {
       amount: Number(data.amount),
       reason: data.reason,
       receipt_url: data.receipt_url || null,
+      ai_status: data.ai_status || "none",
+      ai_extraction: data.ai_extraction || null,
+      ai_flags: data.ai_flags || [],
       status: "pending",
       requested_by: requester.id,
       requested_by_name: requester.name,
@@ -483,7 +490,12 @@ export const demoApi = {
       type: "expense",
       amount: -e.amount,
       description: `Payout: ${e.reason}`,
-      actor_name: `to ${e.recipient_name} · approved by ${approver.name}`,
+      // mirrors the backend: a flagged expense that gets approved anyway says so
+      // on the permanent record, next to the name of whoever approved it
+      actor_name:
+        e.ai_status === "flagged" && e.ai_flags?.length
+          ? `to ${e.recipient_name} · approved by ${approver.name} despite AI flag: ${e.ai_flags[0].message}`
+          : `to ${e.recipient_name} · approved by ${approver.name}`,
       timestamp: e.paid_at,
       expense_id: e.id,
     });
@@ -511,6 +523,47 @@ export const demoApi = {
       expense_id: e.id,
     });
     return clone(e);
+  },
+
+  // demo-only: stands in for the server-side receipt check. It does one thing
+  // for real — remembers what's already been uploaded this session, so
+  // re-uploading the same receipt genuinely trips the duplicate flag. The
+  // extraction itself is simulated; there's no model in demo mode.
+  uploadReceipt: async (id, file, amount, reason) => {
+    await delay(1100);
+    const key = `${file.name}:${file.size}`;
+    const seen = demoReceipts.get(key);
+    const extraction = {
+      vendor: "Adebayo Hardware & Supplies",
+      total_amount: Number(amount) || 0,
+      currency: "NGN",
+      date: new Date().toISOString().slice(0, 10),
+      legible: true,
+    };
+
+    if (seen) {
+      return {
+        receipt_url: seen.url,
+        ai_status: "flagged",
+        ai_extraction: extraction,
+        ai_flags: [{
+          code: "duplicate_receipt",
+          severity: "high",
+          message: `This receipt was already submitted on expense "${seen.reason}" — the identical file.`,
+        }],
+        blocking: false,
+      };
+    }
+
+    const url = `demo://receipt/${encodeURIComponent(file.name)}`;
+    demoReceipts.set(key, { url, reason: reason || "an earlier request" });
+    return {
+      receipt_url: url,
+      ai_status: "clean",
+      ai_extraction: extraction,
+      ai_flags: [],
+      blocking: false,
+    };
   },
 
   getBanks: async () => {

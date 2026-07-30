@@ -89,7 +89,8 @@ def store(collective_id: str, filename: str, data: bytes) -> dict:
     (directory / name).write_bytes(data)
 
     return {
-        "url": f"/receipts/{collective_id}/{name}",
+        # must match the serve route in routers/receipts.py, or the stored URL 404s
+        "url": f"/collectives/{collective_id}/receipts/{name}",
         "path": str(directory / name),
         "sha256": sha256_hex(data),
         "size": len(data),
