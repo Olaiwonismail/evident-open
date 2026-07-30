@@ -1,5 +1,12 @@
 # Nomba Integration — Complete Reference
 
+> **Archived — describes an integration that no longer exists.** Nomba was
+> removed from Evident and replaced by BMoni; see `docs/BMONI_TRANSITION.md` for
+> the migration and the README for how the system works now. Nothing below
+> reflects the current codebase. Kept only as a record of what the per-member
+> NUBAN model did, and why the pooled-account model that replaced it needed a
+> different attribution mechanism.
+
 Everything in Evident that touches Nomba: configuration, auth, the API surface,
 money-in, money-out, reconciliation, failure modes, and the accumulated list of
 Nomba quirks the code works around.
