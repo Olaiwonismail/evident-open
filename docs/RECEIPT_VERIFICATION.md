@@ -34,7 +34,7 @@ Fires only when the request is *both* more than 3σ above the collective's mean
 the mean is noise. Either condition alone fires constantly on a small, lumpy
 expense history.
 
-**3. Document reading** — Claude Opus 5 vision.
+**3. Document reading** — Gemini vision (`gemini-3.6-flash`).
 Extracts vendor, total, currency, date, line items and legibility under a strict
 JSON schema, then compares the total against the requested amount (1% tolerance
 for rounding and fees). Also flags a currency mismatch, an unreadable document,
@@ -102,7 +102,7 @@ the file, runs all three checks, and returns the verdict *before* the expense is
 submitted — so the reviewer sees it while deciding. The result is then passed
 through `POST /collectives/{id}/expenses` to be stored with the expense.
 
-Config: `ANTHROPIC_API_KEY` enables check 3; unset simply disables it.
+Config: `GEMINI_API_KEY` enables check 3; unset simply disables it.
 `RECEIPT_STORAGE_DIR` defaults to `receipts/`.
 
 ## Verification status
@@ -115,9 +115,16 @@ Config: `ANTHROPIC_API_KEY` enables check 3; unset simply disables it.
 | Duplicate flag fires with no model at all | upload route, key unset |
 | Guards — empty file, unknown collective, path traversal | 400 / 404 / 404 |
 
-**Not verified:** the live vision extraction. No Anthropic credentials are
+**Not verified:** the live vision extraction. No Gemini credentials are
 available on this machine, so `extract()` has never been run against the real
-API — only its failure path has. The request shape follows the current
-structured-outputs contract (`output_config.format` with a JSON schema, no
-sampling parameters, `claude-opus-5`), but the first real call should be
-treated as unproven.
+API — only its failure path has.
+
+The request shape was taken from Google's live documentation rather than from
+memory, which mattered: the current API is `client.interactions.create(...)`
+with an `input=[...]` list and a `response_format` schema — **not** the
+`generate_content` form most examples still show. Accepted upload types are
+pinned to what the model can actually read (PNG, JPEG, WEBP, HEIC, HEIF, PDF —
+HEIC included because that is the default iPhone camera format). Inline base64
+caps the whole request at 20MB; the 10MB upload limit keeps receipts inside it.
+
+Still, the first real call should be treated as unproven.

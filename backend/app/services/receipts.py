@@ -41,7 +41,12 @@ logger = logging.getLogger(__name__)
 STORAGE_DIR = Path(os.getenv("RECEIPT_STORAGE_DIR", "receipts"))
 MAX_BYTES = 10 * 1024 * 1024
 
-IMAGE_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
+# Matches what the vision model can actually read, so an accepted upload is
+# never one the reader will reject. HEIC/HEIF matter — that's the default
+# iPhone camera format, and a phone photo is the normal way a receipt arrives.
+# GIF is deliberately absent: not a supported input type, and nobody
+# photographs a receipt as one.
+IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"}
 ALLOWED_TYPES = IMAGE_TYPES | {"application/pdf"}
 
 

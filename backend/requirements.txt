@@ -11,4 +11,3 @@ python-multipart
 apscheduler
 eth-account
 google-genai
-pillow
