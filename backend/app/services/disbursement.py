@@ -1,3 +1,4 @@
+import json
 import logging
 from decimal import Decimal
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -73,6 +74,20 @@ async def disburse_expense(expense_id: str, approver_id: str, db: AsyncSession) 
 
     # write ledger entry BEFORE the transfer call so intent is always recorded
     new_balance = current_balance - Decimal(str(expense.amount))
+
+    # Publish the AI's verdict beside the human decision. The ledger is
+    # append-only and public, so "flagged, approved anyway by X" becomes part of
+    # the permanent record — the model is held to the same transparency rule as
+    # the committee rather than being an invisible advisor.
+    actor = approver.name
+    if expense.ai_status == "flagged" and expense.ai_flags:
+        try:
+            flags = json.loads(expense.ai_flags)
+            headline = next((f for f in flags if f.get("severity") == "high"), flags[0])
+            actor = f"{approver.name} — approved despite AI flag: {headline['message'][:120]}"
+        except (ValueError, KeyError, IndexError):
+            actor = f"{approver.name} — approved despite AI flag"
+
     ledger_entry = LedgerEntry(
         collective_id=expense.collective_id,
         type="expense",
@@ -80,7 +95,7 @@ async def disburse_expense(expense_id: str, approver_id: str, db: AsyncSession) 
         amount=-Decimal(str(expense.amount)),
         balance_after=new_balance,
         description=f"Expense: {expense.reason[:80]}",
-        actor_name=approver.name,
+        actor_name=actor,
     )
     db.add(ledger_entry)
     await db.commit()

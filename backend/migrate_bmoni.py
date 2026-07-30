@@ -20,6 +20,12 @@ ADD_COLUMNS = [
     ("members", "bmoni_user_id"),
     ("members", "smart_wallet_id"),
     ("members", "wallet_address"),
+    # receipt verification
+    ("expenses", "receipt_sha256"),
+    ("expenses", "receipt_fingerprint"),
+    ("expenses", "ai_status"),
+    ("expenses", "ai_extraction"),
+    ("expenses", "ai_flags"),
 ]
 
 

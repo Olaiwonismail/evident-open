@@ -1,3 +1,4 @@
+import json
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -22,6 +23,13 @@ class SubmitExpenseRequest(BaseModel):
     receipt_url: str | None = None
     recipient_account: str
     recipient_bank_code: str
+    # carried over from POST /receipts so the verification result is stored with
+    # the expense and can be published on the ledger next to the human decision
+    receipt_sha256: str | None = None
+    receipt_fingerprint: str | None = None
+    ai_status: str | None = None
+    ai_extraction: dict | None = None
+    ai_flags: list[dict] | None = None
 
 
 class ApproveExpenseRequest(BaseModel):
@@ -57,6 +65,9 @@ def _serialize_expense(e: Expense, names: dict[str, str]) -> dict:
         "decided_at": e.updated_at.isoformat() if decided and e.updated_at else None,
         "decision_reason": e.rejection_reason,
         "paid_at": e.updated_at.isoformat() if e.status == "paid" and e.updated_at else None,
+        "ai_status": e.ai_status,
+        "ai_flags": json.loads(e.ai_flags) if e.ai_flags else [],
+        "ai_extraction": json.loads(e.ai_extraction) if e.ai_extraction else None,
     }
 
 
@@ -98,6 +109,12 @@ async def submit_expense(collective_id: str, body: SubmitExpenseRequest, db: Asy
         recipient_account=body.recipient_account,
         recipient_name=recipient_name,
         recipient_bank_code=body.recipient_bank_code,
+        receipt_sha256=body.receipt_sha256,
+        receipt_fingerprint=body.receipt_fingerprint,
+        # advisory only — a flagged expense submits exactly like a clean one
+        ai_status=body.ai_status or "none",
+        ai_extraction=json.dumps(body.ai_extraction) if body.ai_extraction else None,
+        ai_flags=json.dumps(body.ai_flags) if body.ai_flags else None,
     )
     db.add(expense)
     await db.commit()

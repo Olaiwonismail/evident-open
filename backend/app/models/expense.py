@@ -23,6 +23,17 @@ class Expense(Base):
     rejection_reason: Mapped[str] = mapped_column(Text, nullable=True)
     # provider's reference for the outbound transfer, used to check its status
     transfer_ref: Mapped[str] = mapped_column(String, nullable=True)
+    # Receipt fingerprints. sha256 catches a byte-identical re-upload;
+    # receipt_fingerprint hashes vendor+total+date as read off the document, so
+    # it still matches when the same receipt is re-photographed or re-cropped.
+    receipt_sha256: Mapped[str] = mapped_column(String, nullable=True)
+    receipt_fingerprint: Mapped[str] = mapped_column(String, nullable=True)
+    # What the vision model read off the receipt, and what didn't add up.
+    # Advisory only — these never block a payout, they inform the approver
+    # and are published on the ledger next to the human decision.
+    ai_status: Mapped[str] = mapped_column(String, default="none")  # none|clean|flagged|error
+    ai_extraction: Mapped[str] = mapped_column(Text, nullable=True)  # JSON
+    ai_flags: Mapped[str] = mapped_column(Text, nullable=True)  # JSON list
     timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

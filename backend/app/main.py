@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.database import init_db
-from app.routers import collectives, ledger, expenses, banks, webhooks
+from app.routers import collectives, ledger, expenses, banks, webhooks, receipts
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -66,6 +66,7 @@ app.include_router(ledger.router)
 app.include_router(expenses.router)
 app.include_router(banks.router)
 app.include_router(webhooks.router)
+app.include_router(receipts.router)
 
 
 @app.get("/health")

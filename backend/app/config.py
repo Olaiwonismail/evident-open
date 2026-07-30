@@ -28,6 +28,11 @@ class Settings(BaseSettings):
     bmoni_test_bvn: str = "22222222222"
     bmoni_webhook_secret: str = ""
 
+    # Receipt verification. Unset simply disables the vision check — expenses
+    # still submit, and the duplicate/anomaly checks still run without it.
+    gemini_api_key: str = ""
+    receipt_storage_dir: str = "receipts"
+
     class Config:
         env_file = ".env"
         # ignore unrecognised vars rather than refusing to boot over them — a
