@@ -5,31 +5,45 @@ more inclusive ways for people to interact with money?
 
 ---
 
-## 1. Target user and financial-inclusion problem
+## 1. The problem: payment systems confirm, they do not account
 
-**Who:** members of Nigerian informal savings and welfare collectives — ajo /
-esusu / adashe groups, market association funds, alumni sets, estate levies,
-church and mosque committees.
+A payment system tells you a transaction succeeded. It does not tell you what
+happened to the money afterward — who authorised the next movement, on what
+grounds, or whether the stated reason matches the document behind it. That
+record exists, but it is private to whoever holds the funds, and everyone else
+is asked to take it on trust.
 
-**The exclusion is not from bank accounts. It is from accountability.**
+**So transparency today is a report somebody produces, not a property of the
+rail.** A report can be delayed, summarised, or written to match a story. The
+people it concerns most are the least able to check it.
 
-These groups already move real money, often monthly, often for years. What they
-do not have is any trustworthy record of it. The pooled fund sits in one
-person's personal account. The ledger is that person's notebook, or their
-memory, or a WhatsApp message. A member who asks "where did my ₦20,000 go?" is
-asking a human being to vouch for themselves.
+That gap is invisible when you are the only person your money belongs to. It
+becomes the whole problem the moment money is **held on someone else's behalf**
+— which describes most of how money actually moves in Nigeria: pooled savings,
+cooperative funds, association dues, project budgets, community levies, church
+and mosque collections, market-union contributions. In every case the person who
+put the money in has no independent way to see where it went.
 
-That produces two costs. The visible one is theft. The larger, quieter one is
-that people who *would* pool money don't, or cap the amount at what they can
-afford to lose, because the only control available is trusting the treasurer.
-Formal financial infrastructure has not reached these groups — not because they
-lack accounts, but because nothing available to them makes group money legible
-to the group.
+**Who is left out:** not people without accounts. People without *visibility* —
+anyone whose money is held, pooled, or spent by someone else, and whose only
+instrument for checking is asking that person and believing the answer.
 
-**What Evident changes:** the record stops being a person's word. Every
-contribution and every payout lands on an append-only public ledger the whole
-group can read in real time, and every expense carries a stated reason, a
-receipt, and a named approver — permanently.
+**What Evident changes:** it makes accountability a property of the payment
+system rather than a document produced afterward.
+
+- The ledger is built from **BMoni's own transaction data**, not typed in by an
+  administrator — so it cannot be edited to match a story.
+- It is **append-only and public**: entries are never rewritten or deleted, and
+  every stakeholder reads the same record in real time.
+- Every outbound payment carries a stated reason, a receipt, and a **named
+  approver**, permanently attached.
+- **AI verifies the justification, not just the arithmetic** — the document
+  behind a payment is read and checked before a human commits the funds.
+
+A Nigerian community collective is the first instance we have built, because it
+is where the absence bites hardest and where the whole loop can be demonstrated
+end to end. The mechanism — transparency enforced by the payment rail itself —
+is not specific to it.
 
 ---
 

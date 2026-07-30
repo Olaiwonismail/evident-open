@@ -19,7 +19,7 @@ export const ALLOW_SELF_APPROVAL = false;
 // UI was silently calling localhost.)
 const API = import.meta.env.DEV
   ? "http://127.0.0.1:8000"
-  : "https://evident-z4te.onrender.com";
+  : "https://evident-open.onrender.com";
 
 // Receipts are stored on the backend and referenced by a path, not an absolute
 // URL — resolve against the API origin so the link works from the deployed UI.
